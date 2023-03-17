@@ -28,7 +28,6 @@ class Crawler:
         self.open_vpn = 'open'
         self.soup = None
 
-
     def open_windscribe(self):
         os.startfile('C:\\Program Files\\Windscribe\\Windscribe.exe')
         time.sleep(3)
@@ -105,19 +104,20 @@ class Crawler:
             print(i)
             link = children['link']
             response = req.get(link, headers=self.headers)
-            response.raise_for_status()  # raise an exception if status code is not 200
+            response.raise_for_status()
             soup = bs(response.text, 'html.parser')
-            children_name_file = re.sub(r'[^\w\s]', '', children['name'])
+            image_main = soup.find('image', id='svg_gg')
+            image_main = image_main.get('xlink:href') if image_main else None
+
             if not os.path.exists(self.path + '/json'):
                 os.makedirs(self.path + '/json')
             if self.save_file:
                 if not os.path.exists(self.path + 'html/' + self.name + '/children'):
                     os.makedirs(self.path + 'html/' + self.name + '/children')
+                children_name_file = re.sub(r'[^\w\s]', '', children['name'])
                 with open(self.path + 'html/' + self.name + '/children/' + children_name_file + '.html', 'w',
                           encoding='utf-8') as f:
                     f.write(response.text)
-            image_src = soup.find('image', id='svg_gg')
-            image_src = image_src.get('href') if image_src else None
             rows = soup.find_all('tr', class_='parts_list_row')
             nameChildren = soup.find('div', class_='parts_list_Section_Name')
             nameChildren = nameChildren.text if nameChildren else None
@@ -151,8 +151,6 @@ class Crawler:
                     # parts_list_QtyReq
                     parts_list_QtyReq = row.find('td', class_='parts_list_QtyReq')
                     parts_list_QtyReq = parts_list_QtyReq.text if parts_list_QtyReq else None
-                    # image_src
-                    # end
                     result.append({
                         'parts_list_HLSM_PartNo': parts_list_HLSM_PartNo,
                         'parts_list_PartNo': parts_list_PartNo,
@@ -161,7 +159,7 @@ class Crawler:
                         'parts_list_descrip': parts_list_descrip,
                         'parts_list_SalePrice': parts_list_SalePrice,
                         'parts_list_QtyReq': parts_list_QtyReq,
-                        'image_src': image_src
+                        'image_main': image_main,
                     })
                 except Exception as e:
                     print(e)
