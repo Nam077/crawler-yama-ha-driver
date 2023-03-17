@@ -3,6 +3,7 @@ from datetime import datetime
 
 import requests as req
 from bs4 import BeautifulSoup as bs
+import os
 
 proxies = ['200.54.194.13:53281', '45.42.177.58:3128', '200.105.215.22:33630', '86.120.122.3:3128',
            '190.61.88.147:8080']
@@ -12,9 +13,15 @@ for proxy in proxies:
 
 
 class Crawler:
-    def __init__(self, url, name=None):
+    def __init__(self, url, name=None, save_file=False):
         self.url = url
-        self.name = name
+        self.path = None
+        print(url, name, save_file)
+        if name is None:
+            self.name = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        else:
+            self.name = name
+        self.save_file = save_file
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36'
         }
@@ -31,8 +38,14 @@ class Crawler:
 
         self.soup = bs(response.text, 'html.parser')
         # save response to html file
-        with open('response.html', 'w', encoding='utf-8') as f:
-            f.write(self.soup.prettify())
+        if self.save_file:
+            if not os.path.exists('html'):
+                os.mkdir('html')
+            if not os.path.exists('html/' + self.name):
+                os.mkdir('html/' + self.name)
+            self.path = 'html/' + self.name
+            with open(self.path + '/' + self.name + '.html', 'w', encoding='utf-8') as f:
+                f.write(response.text)
 
     def get_title(self):
         if not self.soup:
@@ -63,11 +76,11 @@ class Crawler:
             return None
         children_s = self.get_children_s()
         i = 0
-        name_file = None
-        if self.name is not None:
-            name_file = self.name
-        else:
-            name_file = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        if not os.path.exists(self.path + '/json'):
+            os.mkdir(self.path + '/json')
+        if self.save_file:
+            if not os.path.exists(self.path + '/children'):
+                os.mkdir(self.path + '/children')
         for children in children_s:
             i += 1
             print(i)
@@ -75,6 +88,8 @@ class Crawler:
             response = req.get(link, headers=self.headers)
             response.raise_for_status()  # raise an exception if status code is not 200
             soup = bs(response.text, 'html.parser')
+            with open(self.path + '/children/' + children['name'] + '.html', 'w', encoding='utf-8') as f:
+                f.write(response.text)
             image_src = soup.find('image', id='svg_gg').get('xlink:href')
             rows = soup.find_all('tr', class_='parts_list_row')
             nameChildren = soup.find('div', class_='parts_list_Section_Name')
@@ -126,14 +141,16 @@ class Crawler:
             children.update({'infor': result})
             print(children)
 
-            with open('data/' + name_file + '.json', 'w', encoding='utf-8') as f:
+            with open(self.path + '/json/' + children['name'] + '.json', 'w', encoding='utf-8') as f:
                 json.dump(children_s, f, indent=4, ensure_ascii=False)
         return children_s
 
 
 url_ = 'https://onlinemicrofiche.com/riva_normal/showmodel/13/suzukiatv/406'
 
-crawler = Crawler(url_)
+crawler = Crawler(url_, save_file=True, name='suzukiatv-406')
+#muốn lưu file html thì truyền thêm save_file=True (mặc định là False)
+#muốn lưu file theo tên thì truyền thêm name (mặc định là None)
 # crawler = Crawler(url_,name='suzuki')
 # truyền thêm tên file json
 print(crawler.get_infor_children())
