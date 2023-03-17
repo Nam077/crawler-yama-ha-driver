@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 
 import requests as req
 from bs4 import BeautifulSoup as bs
@@ -11,9 +12,9 @@ for proxy in proxies:
 
 
 class Crawler:
-    def __init__(self, url):
+    def __init__(self, url, name=None):
         self.url = url
-
+        self.name = name
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36'
         }
@@ -25,6 +26,7 @@ class Crawler:
         except req.exceptions.RequestException as e:
             print(e)
             self.soup = None
+
             return
 
         self.soup = bs(response.text, 'html.parser')
@@ -61,6 +63,11 @@ class Crawler:
             return None
         children_s = self.get_children_s()
         i = 0
+        name_file = ''
+        if self.name is not None:
+            name_file = self.name
+        else:
+            name_file = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         for children in children_s:
             i += 1
             print(i)
@@ -118,13 +125,15 @@ class Crawler:
                     continue
             children.update({'infor': result})
             print(children)
-            with open('infor_children.json', 'w', encoding='utf-8') as f:
+
+            with open('data/' + name_file + '.json', 'w', encoding='utf-8') as f:
                 json.dump(children_s, f, indent=4, ensure_ascii=False)
         return children_s
 
 
-url_ = 'https://onlinemicrofiche.com/riva_normal/showmodel/13/yamahaatv/788?fbclid=IwAR0u9MTTO_09VyacRwT8Sp' \
-       '-7pGpOEG7KRgQBcQpz9Jdw5xXxSuTOytezwLA'
+url_ = 'https://onlinemicrofiche.com/riva_normal/showmodel/13/suzukiatv/406'
 
 crawler = Crawler(url_)
+# crawler = Crawler(url_,name='suzuki')
+# truyền thêm tên file json
 print(crawler.get_infor_children())
