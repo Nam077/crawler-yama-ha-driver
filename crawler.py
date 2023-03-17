@@ -63,7 +63,7 @@ class Crawler:
             return None
         children_s = self.get_children_s()
         i = 0
-        name_file = ''
+        name_file = None
         if self.name is not None:
             name_file = self.name
         else:
