@@ -1,6 +1,9 @@
 import json
+import re
+import time
 from datetime import datetime
 
+import pyautogui
 import requests as req
 from bs4 import BeautifulSoup as bs
 import os
@@ -11,40 +14,59 @@ proxies_list = []
 for proxy in proxies:
     proxies_list.append({'http': 'http://' + proxy, 'https': 'https://' + proxy})
 
+open_status = 'open'
+
 
 class Crawler:
-    def __init__(self, url, name=None, save_file=False):
+    def __init__(self, url, name=None, save_file=False, open_status=False):
+        self.headers = None
         self.url = url
         self.path = None
-        print(url, name, save_file)
-        if name is None:
-            self.name = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        else:
-            self.name = name
+        self.open_status = open_status
+        self.name = name
         self.save_file = save_file
+        self.open_vpn = 'open'
+        self.soup = None
+
+
+    def open_windscribe(self):
+        os.startfile('C:\\Program Files\\Windscribe\\Windscribe.exe')
+        time.sleep(3)
+        x = 1154
+        y = 455
+        if not self.open_status:
+            pyautogui.click(x=x, y=y)
+        if self.open_status:
+            time.sleep(3)
+            pyautogui.click(x=x, y=y)
+        self.open_status = True
+
+    def get_soup(self):
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36'
         }
+        if self.name is None:
+            self.name = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         try:
-
-            response = req.get(url, headers=self.headers)
-
+            response = req.get(self.url, headers=self.headers)
             response.raise_for_status()  # raise an exception if status code is not 200
         except req.exceptions.RequestException as e:
             print(e)
             self.soup = None
-
             return
 
         self.soup = bs(response.text, 'html.parser')
         # save response to html file
+        if not os.path.exists('data/'):
+            os.makedirs('data/')
+        self.path = 'data/'
         if self.save_file:
-            if not os.path.exists('html'):
-                os.mkdir('html')
-            if not os.path.exists('html/' + self.name):
-                os.mkdir('html/' + self.name)
-            self.path = 'html/' + self.name
-            with open(self.path + '/' + self.name + '.html', 'w', encoding='utf-8') as f:
+            if not os.path.exists('data/html'):
+                os.makedirs('data/html')
+            if not os.path.exists('data/html/' + self.name):
+                os.makedirs('data/html/' + self.name)
+
+            with open(self.path + '/html/' + self.ame + '.html', 'w', encoding='utf-8') as f:
                 f.write(response.text)
 
     def get_title(self):
@@ -55,6 +77,7 @@ class Crawler:
     # Tìm tất cả các thẻ div có class là SecOneSubSectionContainer
     # những thẻ này chứa tên của các element
     def get_children_s(self):
+        self.get_soup()
         if not self.soup:
             return None
         children_s = self.soup.find_all('div', {'class': 'SecOneSubSectionContainer'})
@@ -72,15 +95,11 @@ class Crawler:
 
     # Lấy thông tin của các element con
     def get_infor_children(self):
-        if not self.soup:
-            return None
         children_s = self.get_children_s()
+        if not children_s:
+            return []
         i = 0
-        if not os.path.exists(self.path + '/json'):
-            os.mkdir(self.path + '/json')
-        if self.save_file:
-            if not os.path.exists(self.path + '/children'):
-                os.mkdir(self.path + '/children')
+
         for children in children_s:
             i += 1
             print(i)
@@ -88,9 +107,17 @@ class Crawler:
             response = req.get(link, headers=self.headers)
             response.raise_for_status()  # raise an exception if status code is not 200
             soup = bs(response.text, 'html.parser')
-            with open(self.path + '/children/' + children['name'] + '.html', 'w', encoding='utf-8') as f:
-                f.write(response.text)
-            image_src = soup.find('image', id='svg_gg').get('xlink:href')
+            children_name_file = re.sub(r'[^\w\s]', '', children['name'])
+            if not os.path.exists(self.path + '/json'):
+                os.makedirs(self.path + '/json')
+            if self.save_file:
+                if not os.path.exists(self.path + 'html/' + self.name + '/children'):
+                    os.makedirs(self.path + 'html/' + self.name + '/children')
+                with open(self.path + 'html/' + self.name + '/children/' + children_name_file + '.html', 'w',
+                          encoding='utf-8') as f:
+                    f.write(response.text)
+            image_src = soup.find('image', id='svg_gg')
+            image_src = image_src.get('href') if image_src else None
             rows = soup.find_all('tr', class_='parts_list_row')
             nameChildren = soup.find('div', class_='parts_list_Section_Name')
             nameChildren = nameChildren.text if nameChildren else None
@@ -99,6 +126,7 @@ class Crawler:
             print(children['name'])
             print(children['link'])
             for row in rows:
+
                 try:
                     # parts_list_HLSM_PartNo
                     parts_list_HLSM_PartNo = row.find('input', class_='parts_list_HLSM_PartNo')
@@ -139,18 +167,33 @@ class Crawler:
                     print(e)
                     continue
             children.update({'infor': result})
-            print(children)
+            # print(children)
 
-            with open(self.path + '/json/' + children['name'] + '.json', 'w', encoding='utf-8') as f:
+            with open(self.path + '/json/' + self.name + '.json', 'w', encoding='utf-8') as f:
                 json.dump(children_s, f, indent=4, ensure_ascii=False)
         return children_s
 
 
-url_ = 'https://onlinemicrofiche.com/riva_normal/showmodel/13/suzukiatv/406'
-
-crawler = Crawler(url_, save_file=True, name='suzukiatv-406')
-#muốn lưu file html thì truyền thêm save_file=True (mặc định là False)
-#muốn lưu file theo tên thì truyền thêm name (mặc định là None)
+# muốn lưu file html thì truyền thêm save_file=True (mặc định là False)
+# muốn lưu file theo tên thì truyền thêm name (mặc định là None)
 # crawler = Crawler(url_,name='suzuki')
 # truyền thêm tên file json
-print(crawler.get_infor_children())
+datas = [
+    {'url': 'https://onlinemicrofiche.com/riva_normal/showmodel/13/yamahaatv/788', 'name': None},
+    {'url': 'https://onlinemicrofiche.com/riva_normal/showmodel/13/yamahaatv/785', 'name': 'yanaha'},
+
+]
+
+for data in datas:
+    check = True
+    while check:
+        if data['name'] and data['name'] != '' and data['name'] is not None:
+            crawler = Crawler(data['url'], name=data['name'])
+        else:
+            crawler = Crawler(data['url'])
+        result = crawler.get_infor_children()
+        if not result:
+            crawler.open_windscribe()
+            time.sleep(5)
+        else:
+            check = False
